@@ -43,6 +43,7 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const CLASS_ID = (urlParams.get('class') || 'DEFAULT').trim().toUpperCase();
+    let globalSlogan = "Chúc bạn học tập tốt!"; // Biến toàn cục lưu slogan tạm thời
 
     window.onload = async function() {
       try {
@@ -52,16 +53,12 @@
         document.getElementById('class-title').innerText = config.ten_lop || config.Ten_Lop || "Lớp học chưa kích hoạt";
         document.getElementById('class-teacher').innerText = "Giảng viên: " + (config.giang_vien || config.Giang_Vien || "Chưa rõ");
         
-        // FIX LỖI SLOGAN: Quét mọi trường hợp Key thuộc tính để không bao giờ bị undefined
         let sloganText = config.slogan || config.Slogan || config["slogan"] || "";
         if (sloganText && sloganText.toString().toLowerCase() !== "undefined") {
-          document.getElementById('class-slogan').innerText = `"${sloganText}"`;
-        } else {
-          document.getElementById('class-slogan').innerText = '"Chúc bạn học tập tốt!"';
+          globalSlogan = sloganText;
         }
       } catch(e) {
         document.getElementById('class-title').innerText = "Lỗi kết nối dữ liệu!";
-        document.getElementById('class-slogan').innerText = '"Chúc bạn học tập tốt!"';
       }
     };
 
@@ -88,9 +85,11 @@
             if (Date.now() < end) { requestAnimationFrame(frame); }
           }());
 
+          // Ẩn form, bật màn hình WOW và gán chính xác Slogan tại đây
           document.getElementById('form-card').classList.add('hidden');
           document.getElementById('wow-card').classList.remove('hidden');
           document.getElementById('user-welcome').innerText = "Xin chào: " + result.hoTen;
+          document.getElementById('class-slogan').innerText = `"${globalSlogan}"`;
         } else {
           alert(result.message);
           btn.innerText = "XÁC NHẬN ĐIỂM DANH";
