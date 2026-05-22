@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>L&D Mobile Dashboard - Manual Checkin</title>
+  <title>L&D Mobile Dashboard - Search Mode</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-slate-950 text-white min-h-screen flex flex-col antialiased font-sans select-none">
@@ -12,11 +12,11 @@
     const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbwRDHAWgt5bPnrorYr-AgDvvOvLD8s7wX9ackQCOc5QzDZCW6VtWCpIokbkHSo_4Pg/exec";
   </script>
 
-  <div class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
+  <div class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md space-y-3">
     <div class="flex justify-between items-center">
       <div>
         <h1 class="text-md font-black tracking-tight text-amber-400 uppercase" id="dash-class-name">QUẢN LÝ LỚP HỌC</h1>
-        <p class="text-[10px] text-slate-400 mt-0.5">Realtime • Tính năng Check-in hộ</p>
+        <p class="text-[10px] text-slate-400 mt-0.5">Realtime • Tìm kiếm thông minh</p>
       </div>
       <div class="bg-slate-950 border border-slate-700 px-4 py-1.5 rounded-xl text-center">
         <span class="text-[9px] block text-slate-500 font-bold uppercase">Sĩ Số</span>
@@ -24,13 +24,18 @@
       </div>
     </div>
 
-    <div class="flex mt-4 bg-slate-950 p-1 rounded-xl border border-slate-800">
+    <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
       <button onclick="switchTab('vang')" id="btn-tab-vang" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 bg-amber-500 text-slate-950 shadow">
         CHƯA ĐẾN (<span id="count-vang">0</span>)
       </button>
       <button onclick="switchTab('den')" id="btn-tab-den" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 text-slate-400">
         ĐÃ ĐẾN (<span id="count-den">0</span>)
       </button>
+    </div>
+
+    <div class="relative">
+      <input type="text" id="search-input" oninput="handleSearch()" placeholder="🔍 Gõ Tên hoặc Mã nhân sự cần tìm..." class="w-full bg-slate-950 border border-slate-700 text-sm rounded-xl px-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400 transition shadow-inner">
+      <button onclick="clearSearch()" id="clear-search-btn" class="hidden absolute right-3 top-2.5 text-slate-400 hover:text-white text-sm font-bold">✕</button>
     </div>
   </div>
 
@@ -57,6 +62,7 @@
     const CLASS_ID = (urlParams.get('class') || 'DEFAULT').trim().toUpperCase();
     let currentTab = 'vang';
     let isProcessing = false;
+    let localDataCache = null; // Lưu trữ tạm dữ liệu để tìm kiếm không bị gián đoạn khi reload
 
     function switchTab(tab) {
       currentTab = tab;
@@ -76,9 +82,24 @@
         viewDen.classList.remove('hidden');
         viewVang.classList.add('hidden');
       }
+      renderData(); // Đổ lại dữ liệu khớp theo bộ lọc tìm kiếm của Tab mới
     }
 
-    // TÍNH NĂNG KAIZEN TỐI ƯU: QUẢN LÝ LỚP BẤM ĐIỂM DANH THỦ CÔNG HỘ HỌC VIÊN
+    // Xóa nhanh chữ trong ô tìm kiếm
+    function clearSearch() {
+      document.getElementById('search-input').value = "";
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      renderData();
+    }
+
+    // Kích hoạt bộ lọc tìm kiếm thời gian thực khi gõ chữ
+    function handleSearch() {
+      const query = document.getElementById('search-input').value.trim();
+      const clearBtn = document.getElementById('clear-search-btn');
+      if(query.length > 0) { clearBtn.classList.remove('hidden'); } else { clearBtn.classList.add('hidden'); }
+      renderData();
+    }
+
     async function adminForceCheckIn(maNV, buttonElement) {
       if(isProcessing) return;
       if(!confirm(`Xác nhận điểm danh thủ công hộ cho học viên mã: ${maNV}?`)) return;
@@ -93,7 +114,6 @@
         let result = await response.json();
         
         if(result.status === "SUCCESS" || result.status === "OUTSIDER") {
-          // Buộc làm mới dữ liệu cục bộ tức thì mà không cần đợi vòng quét tiếp theo
           await fetchUpdate();
         } else {
           alert(result.message);
@@ -101,7 +121,7 @@
           buttonElement.style.opacity = "1";
         }
       } catch (err) {
-        alert("Kết nối mạng chập chờn, vui lòng ấn lại nhé!");
+        alert("Kết nối mạng lỗi, hãy ấn lại nhé!");
         buttonElement.innerText = originalText;
         buttonElement.style.opacity = "1";
       } finally {
@@ -109,7 +129,7 @@
       }
     }
 
-    // Tiến trình quét dữ liệu real-time
+    // Hàm gọi dữ liệu từ API Google
     async function fetchUpdate() {
       try {
         if(document.getElementById('dash-class-name').innerText === "QUẢN LÝ LỚP HỌC") {
@@ -120,73 +140,103 @@
         }
 
         let res = await fetch(`${CONFIG_API_URL}?action=getDashboard&class=${encodeURIComponent(CLASS_ID)}`);
-        let data = await res.json();
+        localDataCache = await res.json(); // Cập nhật dữ liệu vào bộ nhớ đệm local
         
-        document.getElementById('live-siso').innerText = `${data.daDenCount} / ${data.tongSo}`;
-        document.getElementById('count-vang').innerText = data.listVang.length;
-        document.getElementById('count-den').innerText = data.daDenCount + data.listNgoaiDs.length;
-
-        // 1. Kết xuất nhóm học viên Chưa đến (Có tích hợp nút Gọi + Check-in thủ công)
-        if(data.listVang.length === 0) {
-          document.getElementById('empty-vang').classList.remove('hidden');
-          document.getElementById('container-vang').innerHTML = "";
-        } else {
-          document.getElementById('empty-vang').classList.add('hidden');
-          let htmlVang = "";
-          data.listVang.forEach(item => {
-            htmlVang += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-800/60 flex justify-between items-center shadow-sm">
-              <div class="truncate max-w-[50%]">
-                <p class="font-bold text-slate-200 text-sm truncate">${item.hoTen}</p>
-                <p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • ${item.pb}</p>
-              </div>
-              <div class="flex items-center gap-1.5">
-                <a href="tel:${item.sdt}" class="bg-slate-800 active:bg-slate-700 text-amber-400 text-[11px] font-bold px-3 py-2 rounded-xl border border-slate-700">
-                  📞 Gọi
-                </a>
-                <button onclick="adminForceCheckIn('${item.maNV}', this)" class="bg-emerald-500 active:bg-emerald-600 text-slate-950 text-[11px] font-black px-3 py-2 rounded-xl shadow-md shadow-emerald-500/10 cursor-pointer">
-                  ✓ Check-in
-                </button>
-              </div>
-            </div>`;
-          });
-          document.getElementById('container-vang').innerHTML = htmlVang;
-        }
-
-        // 2. Kết xuất nhóm học viên Đã đến
-        let htmlDen = "";
-        data.listDaDen.reverse().forEach(item => {
-          htmlDen += `<div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
-            <div>
-              <p class="font-bold text-slate-300 text-sm">${item.hoTen}</p>
-              <p class="text-[11px] text-slate-500 mt-0.5">${item.maNV} • 📞 ${item.sdt}</p>
-            </div>
-            <span class="text-[10px] bg-emerald-500/10 text-emerald-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
-          </div>`;
-        });
-        document.getElementById('container-den').innerHTML = htmlDen;
-
-        // 3. Kết xuất nhóm học viên Ngoài danh sách gốc
-        if(data.listNgoaiDs.length > 0) {
-          document.getElementById('wrapper-ngoai').classList.remove('hidden');
-          let htmlNgoai = "";
-          data.listNgoaiDs.reverse().forEach(item => {
-            htmlNgoai += `<div class="bg-rose-950/20 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
-              <div>
-                <p class="font-bold text-rose-400 text-sm">Mã gõ: ${item.maNV}</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">Tên hệ thống lưu: ${item.hoTen}</p>
-              </div>
-              <span class="text-[10px] bg-rose-500/10 text-rose-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
-            </div>`;
-          });
-          document.getElementById('container-ngoai').innerHTML = htmlNgoai;
-        } else {
-          document.getElementById('wrapper-ngoai').classList.add('hidden');
-        }
-
-      } catch (e) { console.error("Lỗi đồng bộ cục bộ: ", e); }
+        renderData(); // Gọi hàm hiển thị
+      } catch (e) { console.error("Lỗi đồng bộ dữ liệu: ", e); }
     }
 
-    setInterval(fetchUpdate, 3000); // Tự động cập nhật mỗi 3 giây thông qua Cache chống lag
+    // HÀM KAIZEN: XỬ LÝ LỌC TÌM KIẾM VÀ HIỂN THỊ DỮ LIỆU CHUẨN XÁC
+    function renderData() {
+      if(!localDataCache) return;
+
+      const data = localDataCache;
+      const searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
+
+      document.getElementById('live-siso').innerText = `${data.daDenCount} / ${data.tongSo}`;
+      document.getElementById('count-vang').innerText = data.listVang.length;
+      document.getElementById('count-den').innerText = data.daDenCount + data.listNgoaiDs.length;
+
+      // 1. Lọc và Hiển thị nhóm Chưa đến (Vắng)
+      let filteredVang = data.listVang;
+      if(searchQuery !== "") {
+        filteredVang = data.listVang.filter(item => 
+          item.hoTen.toLowerCase().includes(searchQuery) || item.maNV.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if(filteredVang.length === 0) {
+        document.getElementById('empty-vang').classList.remove('hidden');
+        document.getElementById('container-vang').innerHTML = "";
+      } else {
+        document.getElementById('empty-vang').classList.add('hidden');
+        let htmlVang = "";
+        filteredVang.forEach(item => {
+          htmlVang += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-800/60 flex justify-between items-center shadow-sm">
+            <div class="truncate max-w-[50%]">
+              <p class="font-bold text-slate-200 text-sm truncate">${item.hoTen}</p>
+              <p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • ${item.pb}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <a href="tel:${item.sdt}" class="bg-slate-800 active:bg-slate-700 text-amber-400 text-[11px] font-bold px-3 py-2 rounded-xl border border-slate-700">
+                📞 Gọi
+              </a>
+              <button onclick="adminForceCheckIn('${item.maNV}', this)" class="bg-emerald-500 active:bg-emerald-600 text-slate-950 text-[11px] font-black px-3 py-2 rounded-xl shadow-md shadow-emerald-500/10 cursor-pointer">
+                ✓ Check-in
+              </button>
+            </div>
+          </div>`;
+        });
+        document.getElementById('container-vang').innerHTML = htmlVang;
+      }
+
+      // 2. Lọc và Hiển thị nhóm Đã đến
+      let filteredDen = [...data.listDaDen].reverse(); // Đảo chiều hiển thị người mới lên đầu
+      if(searchQuery !== "") {
+        filteredDen = filteredDen.filter(item => 
+          item.hoTen.toLowerCase().includes(searchQuery) || item.maNV.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      let htmlDen = "";
+      filteredDen.forEach(item => {
+        htmlDen += `<div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-slate-300 text-sm">${item.hoTen}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">${item.maNV} • 📞 ${item.sdt}</p>
+          </div>
+          <span class="text-[10px] bg-emerald-500/10 text-emerald-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
+        </div>`;
+      });
+      document.getElementById('container-den').innerHTML = htmlDen;
+
+      // 3. Hiển thị nhóm Ngoài danh sách gốc
+      let filteredNgoai = [...data.listNgoaiDs].reverse();
+      if(searchQuery !== "") {
+        filteredNgoai = filteredNgoai.filter(item => 
+          item.hoTen.toLowerCase().includes(searchQuery) || item.maNV.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if(filteredNgoai.length > 0) {
+        document.getElementById('wrapper-ngoai').classList.remove('hidden');
+        let htmlNgoai = "";
+        filteredNgoai.forEach(item => {
+          htmlNgoai += `<div class="bg-rose-950/20 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
+            <div>
+              <p class="font-bold text-rose-400 text-sm">Mã gõ: ${item.maNV}</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Tên hệ thống lưu: ${item.hoTen}</p>
+            </div>
+            <span class="text-[10px] bg-rose-500/10 text-rose-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
+          </div>`;
+        });
+        document.getElementById('container-ngoai').innerHTML = htmlNgoai;
+      } else {
+        document.getElementById('wrapper-ngoai').classList.add('hidden');
+      }
+    }
+
+    setInterval(fetchUpdate, 3500); // Tự động đồng bộ ngầm sau mỗi 3.5 giây
     window.onload = fetchUpdate;
   </script>
 </body>
