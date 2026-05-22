@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>L&D Mobile Dashboard</title>
+  <title>L&D Mobile Dashboard - Manual Checkin</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-slate-950 text-white min-h-screen flex flex-col antialiased font-sans select-none">
 
   <script>
-    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbxe5yq00JcEmT-WCbfhmEHZ40FvlaBJqhc4wXH6sGMP83uowCPMpurol1NpYoTtVbzE/exec";
+    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbwRDHAWgt5bPnrorYr-AgDvvOvLD8s7wX9ackQCOc5QzDZCW6VtWCpIokbkHSo_4Pg/exec";
   </script>
 
   <div class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
     <div class="flex justify-between items-center">
       <div>
         <h1 class="text-md font-black tracking-tight text-amber-400 uppercase" id="dash-class-name">QUẢN LÝ LỚP HỌC</h1>
-        <p class="text-[10px] text-slate-400 mt-0.5">Realtime • Chống lag siêu tốc</p>
+        <p class="text-[10px] text-slate-400 mt-0.5">Realtime • Tính năng Check-in hộ</p>
       </div>
       <div class="bg-slate-950 border border-slate-700 px-4 py-1.5 rounded-xl text-center">
         <span class="text-[9px] block text-slate-500 font-bold uppercase">Sĩ Số</span>
@@ -25,7 +25,7 @@
     </div>
 
     <div class="flex mt-4 bg-slate-950 p-1 rounded-xl border border-slate-800">
-      <button onclick="switchTab('vang')" id="btn-tab-vang" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 bg-amber-50 text-slate-950 shadow">
+      <button onclick="switchTab('vang')" id="btn-tab-vang" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 bg-amber-500 text-slate-950 shadow">
         CHƯA ĐẾN (<span id="count-vang">0</span>)
       </button>
       <button onclick="switchTab('den')" id="btn-tab-den" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 text-slate-400">
@@ -53,12 +53,11 @@
   </div>
 
   <script>
-    // KAIZEN ĐA LỚP: Tự động nhận diện mã lớp để lấy Dashboard tương ứng
     const urlParams = new URLSearchParams(window.location.search);
     const CLASS_ID = (urlParams.get('class') || 'DEFAULT').trim().toUpperCase();
     let currentTab = 'vang';
+    let isProcessing = false;
 
-    // Hàm chuyển đổi tab mượt mà
     function switchTab(tab) {
       currentTab = tab;
       const btnVang = document.getElementById('btn-tab-vang');
@@ -79,17 +78,47 @@
       }
     }
 
-    // Luồng đồng bộ Dashboard cập nhật sau mỗi 3 giây thông qua Cache chống lag
+    // TÍNH NĂNG KAIZEN TỐI ƯU: QUẢN LÝ LỚP BẤM ĐIỂM DANH THỦ CÔNG HỘ HỌC VIÊN
+    async function adminForceCheckIn(maNV, buttonElement) {
+      if(isProcessing) return;
+      if(!confirm(`Xác nhận điểm danh thủ công hộ cho học viên mã: ${maNV}?`)) return;
+
+      isProcessing = true;
+      const originalText = buttonElement.innerText;
+      buttonElement.innerText = "...";
+      buttonElement.style.opacity = "0.5";
+
+      try {
+        let response = await fetch(`${CONFIG_API_URL}?maNV=${encodeURIComponent(maNV)}&class=${encodeURIComponent(CLASS_ID)}`, { method: 'POST' });
+        let result = await response.json();
+        
+        if(result.status === "SUCCESS" || result.status === "OUTSIDER") {
+          // Buộc làm mới dữ liệu cục bộ tức thì mà không cần đợi vòng quét tiếp theo
+          await fetchUpdate();
+        } else {
+          alert(result.message);
+          buttonElement.innerText = originalText;
+          buttonElement.style.opacity = "1";
+        }
+      } catch (err) {
+        alert("Kết nối mạng chập chờn, vui lòng ấn lại nhé!");
+        buttonElement.innerText = originalText;
+        buttonElement.style.opacity = "1";
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    // Tiến trình quét dữ liệu real-time
     async function fetchUpdate() {
       try {
-        // Tải thông tin tiêu đề lớp lên trước
         if(document.getElementById('dash-class-name').innerText === "QUẢN LÝ LỚP HỌC") {
           let resConfig = await fetch(`${CONFIG_API_URL}?class=${encodeURIComponent(CLASS_ID)}`);
           let cfg = await resConfig.json();
-          if(cfg.ten_lop) document.getElementById('dash-class-name').innerText = cfg.ten_lop.toUpperCase();
+          let name = cfg.ten_lop || cfg.Ten_Lop;
+          if(name) document.getElementById('dash-class-name').innerText = name.toUpperCase();
         }
 
-        // Tải dữ liệu sĩ số và các luồng check-in
         let res = await fetch(`${CONFIG_API_URL}?action=getDashboard&class=${encodeURIComponent(CLASS_ID)}`);
         let data = await res.json();
         
@@ -97,7 +126,7 @@
         document.getElementById('count-vang').innerText = data.listVang.length;
         document.getElementById('count-den').innerText = data.daDenCount + data.listNgoaiDs.length;
 
-        // 1. Đổ dữ liệu học viên Chưa đến (Hiện nút Gọi)
+        // 1. Kết xuất nhóm học viên Chưa đến (Có tích hợp nút Gọi + Check-in thủ công)
         if(data.listVang.length === 0) {
           document.getElementById('empty-vang').classList.remove('hidden');
           document.getElementById('container-vang').innerHTML = "";
@@ -105,20 +134,25 @@
           document.getElementById('empty-vang').classList.add('hidden');
           let htmlVang = "";
           data.listVang.forEach(item => {
-            htmlVang += `<div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800/60 flex justify-between items-center shadow-sm">
-              <div class="truncate max-w-[65%]">
+            htmlVang += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-800/60 flex justify-between items-center shadow-sm">
+              <div class="truncate max-w-[50%]">
                 <p class="font-bold text-slate-200 text-sm truncate">${item.hoTen}</p>
                 <p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • ${item.pb}</p>
               </div>
-              <a href="tel:${item.sdt}" class="bg-amber-500 active:bg-amber-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all shadow-md shadow-amber-500/10 flex items-center gap-1">
-                📞 Gọi ngay
-              </a>
+              <div class="flex items-center gap-1.5">
+                <a href="tel:${item.sdt}" class="bg-slate-800 active:bg-slate-700 text-amber-400 text-[11px] font-bold px-3 py-2 rounded-xl border border-slate-700">
+                  📞 Gọi
+                </a>
+                <button onclick="adminForceCheckIn('${item.maNV}', this)" class="bg-emerald-500 active:bg-emerald-600 text-slate-950 text-[11px] font-black px-3 py-2 rounded-xl shadow-md shadow-emerald-500/10 cursor-pointer">
+                  ✓ Check-in
+                </button>
+              </div>
             </div>`;
           });
           document.getElementById('container-vang').innerHTML = htmlVang;
         }
 
-        // 2. Đổ dữ liệu học viên Đã đến
+        // 2. Kết xuất nhóm học viên Đã đến
         let htmlDen = "";
         data.listDaDen.reverse().forEach(item => {
           htmlDen += `<div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
@@ -131,7 +165,7 @@
         });
         document.getElementById('container-den').innerHTML = htmlDen;
 
-        // 3. Đổ dữ liệu học viên Ngoài danh sách
+        // 3. Kết xuất nhóm học viên Ngoài danh sách gốc
         if(data.listNgoaiDs.length > 0) {
           document.getElementById('wrapper-ngoai').classList.remove('hidden');
           let htmlNgoai = "";
@@ -149,11 +183,10 @@
           document.getElementById('wrapper-ngoai').classList.add('hidden');
         }
 
-      } catch (e) { console.error("Lỗi kết nối Dashboard: ", e); }
+      } catch (e) { console.error("Lỗi đồng bộ cục bộ: ", e); }
     }
 
-    // Đặt lệnh chạy tự động quét
-    setInterval(fetchUpdate, 3000);
+    setInterval(fetchUpdate, 3000); // Tự động cập nhật mỗi 3 giây thông qua Cache chống lag
     window.onload = fetchUpdate;
   </script>
 </body>
