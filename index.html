@@ -8,10 +8,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
-<body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white min-h-screen flex items-center justify-center p-4 antialiased selection:bg-amber-500 selection:text-slate-900">
+<body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white min-h-screen flex items-center justify-center p-4 antialiased select-none">
 
   <script>
-    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbxe5yq00JcEmT-WCbfhmEHZ40FvlaBJqhc4wXH6sGMP83uowCPMpurol1NpYoTtVbzE/exec";
+    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbwRDHAWgt5bPnrorYr-AgDvvOvLD8s7wX9ackQCOc5QzDZCW6VtWCpIokbkHSo_4Pg/exec";
   </script>
 
   <div id="form-card" class="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-slate-800/80 text-center animate__animated animate__fadeInUp">
@@ -41,24 +41,30 @@
   </div>
 
   <script>
-    // KAIZEN ĐA LỚP: Tự động lấy tham số mã lớp từ URL (?class=CLASS01)
     const urlParams = new URLSearchParams(window.location.search);
     const CLASS_ID = (urlParams.get('class') || 'DEFAULT').trim().toUpperCase();
 
-    // Tự động load cấu hình của ĐÚNG lớp học khi mở link
     window.onload = async function() {
       try {
         let res = await fetch(`${CONFIG_API_URL}?class=${encodeURIComponent(CLASS_ID)}`);
         let config = await res.json();
-        document.getElementById('class-title').innerText = config.ten_lop || "Lớp học chưa kích hoạt";
-        document.getElementById('class-teacher').innerText = "Giảng viên: " + (config.giang_vien || "Chưa rõ");
-        document.getElementById('class-slogan').innerText = config.slogan ? `"${config.slogan}"` : '"Chúc bạn học tập tốt!"';
+        
+        document.getElementById('class-title').innerText = config.ten_lop || config.Ten_Lop || "Lớp học chưa kích hoạt";
+        document.getElementById('class-teacher').innerText = "Giảng viên: " + (config.giang_vien || config.Giang_Vien || "Chưa rõ");
+        
+        // FIX LỖI SLOGAN: Quét mọi trường hợp Key thuộc tính để không bao giờ bị undefined
+        let sloganText = config.slogan || config.Slogan || config["slogan"] || "";
+        if (sloganText && sloganText.toString().toLowerCase() !== "undefined") {
+          document.getElementById('class-slogan').innerText = `"${sloganText}"`;
+        } else {
+          document.getElementById('class-slogan').innerText = '"Chúc bạn học tập tốt!"';
+        }
       } catch(e) {
         document.getElementById('class-title').innerText = "Lỗi kết nối dữ liệu!";
+        document.getElementById('class-slogan').innerText = '"Chúc bạn học tập tốt!"';
       }
     };
 
-    // Gửi lệnh check-in đa lớp lên Google Sheet
     async function executeCheckIn() {
       const input = document.getElementById('input-maNV');
       const btn = document.getElementById('btn-action');
@@ -70,12 +76,10 @@
       btn.disabled = true;
       
       try {
-        // Đẩy kèm cả mã NV và Mã lớp lên API
-        let response = await fetch(`${CONFIG_API_URL}?action=checkIn&maNV=${encodeURIComponent(maNV)}&class=${encodeURIComponent(CLASS_ID)}`, { method: 'POST' });
+        let response = await fetch(`${CONFIG_API_URL}?maNV=${encodeURIComponent(maNV)}&class=${encodeURIComponent(CLASS_ID)}`, { method: 'POST' });
         let result = await response.json();
         
         if(result.status === "SUCCESS" || result.status === "OUTSIDER") {
-          // BẮN PHÁO HOA TRẢI NGHIỆM WOW TỨC THÌ
           var duration = 3 * 1000;
           var end = Date.now() + duration;
           (function frame() {
@@ -93,7 +97,7 @@
           btn.disabled = false;
         }
       } catch(err) {
-        alert("Hệ thống đang nghẽn hàng đợi, vui lòng bấm lại liền nha!");
+        alert("Hệ thống đang bận ghi nhận, bạn bấm lại phát nữa nhé!");
         btn.innerText = "XÁC NHẬN ĐIỂM DANH";
         btn.disabled = false;
       }
