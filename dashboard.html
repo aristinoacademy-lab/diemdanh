@@ -2,100 +2,145 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Aristino L&D Realtime Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>L&D Mobile Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body class="bg-slate-950 text-white p-6 font-sans antialiased">
+<body class="bg-slate-950 text-white min-h-screen flex flex-col antialiased font-sans select-none">
 
   <script>
-    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbzozNN2jQtiZPFcKyc36P_YNlGvEmwE10eAIXg3-Pl_q8ZGkqGBmxoIFx3QuFgM5sen/exec";
+    const CONFIG_API_URL = "https://script.google.com/macros/s/AKfycbw-AjDAejKDx8gQFKDT-bsKTD_RkAK0XpB7-X3FRGfVxh5-VF2tVsecO72Q1rV8mc_e/exec";
   </script>
 
-  <div class="flex justify-between items-center mb-6 border-b border-slate-900 pb-5">
-    <div>
-      <h1 class="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">GIÁM SÁT ĐIỂM DANH THỜI GIAN THỰC</h1>
-      <p class="text-xs text-slate-500 font-medium tracking-wide mt-1 uppercase">Dữ liệu tự động làm mới mỗi 2 giây</p>
+  <div class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-md font-black tracking-tight text-amber-400 uppercase">Quản Lý Lớp Học</h1>
+        <p class="text-[10px] text-slate-400 mt-0.5">Realtime • Tự động cập nhật</p>
+      </div>
+      <div class="bg-slate-950 border border-slate-700 px-4 py-1.5 rounded-xl text-center">
+        <span class="text-[9px] block text-slate-500 font-bold uppercase">Sĩ Số</span>
+        <span id="live-siso" class="text-lg font-black text-emerald-400 tracking-tighter">0 / 0</span>
+      </div>
     </div>
-    <div class="bg-slate-900 px-8 py-3 rounded-2xl border border-slate-800 text-center shadow-xl">
-      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sĩ Số Hiện Tại</span>
-      <div class="text-4xl font-black text-emerald-400 mt-0.5 tracking-tight" id="live-siso">0 / 0</div>
+
+    <div class="flex mt-4 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <button onclick="switchTab('vang')" id="btn-tab-vang" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 bg-amber-500 text-slate-950">
+        CHƯA ĐẾN (<span id="count-vang">0</span>)
+      </button>
+      <button onclick="switchTab('den')" id="btn-tab-den" class="w-1/2 text-center font-bold text-xs py-2.5 rounded-lg transition-all duration-200 text-slate-400">
+        ĐÃ ĐẾN (<span id="count-den">0</span>)
+      </button>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="p-4 flex-1 pb-10">
     
-    <div class="bg-slate-900/40 p-5 rounded-2xl border border-emerald-500/10 flex flex-col h-[75vh]">
-      <h3 class="font-extrabold text-emerald-400 border-b border-emerald-500/10 pb-3 mb-4 flex justify-between items-center text-sm tracking-wider uppercase">
-        <span>Đã Điểm Danh</span>
-        <span id="badge-da-den" class="bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-0.5 rounded-full text-xs">0</span>
-      </h3>
-      <div class="space-y-2.5 overflow-y-auto pr-1 flex-1" id="list-da-den"></div>
+    <div id="tab-vang" class="space-y-3">
+      <div class="text-center py-8 text-slate-500 text-sm hidden" id="empty-vang">Học viên đã đến đủ! 🎉</div>
+      <div id="container-vang" class="space-y-2.5"></div>
     </div>
 
-    <div class="bg-slate-900/40 p-5 rounded-2xl border border-amber-500/10 flex flex-col h-[75vh]">
-      <h3 class="font-extrabold text-amber-400 border-b border-amber-500/10 pb-3 mb-4 flex justify-between items-center text-sm tracking-wider uppercase">
-        <span>Chưa Đến Lớp (Vắng)</span>
-        <span id="badge-vang" class="bg-amber-500/10 text-amber-400 font-bold px-2.5 py-0.5 rounded-full text-xs">0</span>
-      </h3>
-      <div class="space-y-2.5 overflow-y-auto pr-1 flex-1" id="list-vang"></div>
-    </div>
-
-    <div class="bg-slate-900/40 p-5 rounded-2xl border border-rose-500/10 flex flex-col h-[75vh]">
-      <h3 class="font-extrabold text-rose-400 border-b border-rose-500/10 pb-3 mb-4 flex justify-between items-center text-sm tracking-wider uppercase">
-        <span>Ngoài Danh Sách Đăng Ký</span>
-        <span id="badge-ngoai" class="bg-rose-500/10 text-rose-400 font-bold px-2.5 py-0.5 rounded-full text-xs">0</span>
-      </h3>
-      <div class="space-y-2.5 overflow-y-auto pr-1 flex-1" id="list-ngoai"></div>
+    <div id="tab-den" class="space-y-3 hidden">
+      <div id="container-den" class="space-y-2.5"></div>
+      
+      <div id="wrapper-ngoai" class="hidden mt-6 pt-4 border-t border-slate-800">
+        <div class="text-xs font-bold text-rose-400 uppercase tracking-wider mb-2">Học viên ngoài danh sách gốc:</div>
+        <div id="container-ngoai" class="space-y-2.5"></div>
+      </div>
     </div>
 
   </div>
 
   <script>
-    async function syncDashboard() {
+    let currentTab = 'vang';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const btnVang = document.getElementById('btn-tab-vang');
+      const btnDen = document.getElementById('btn-tab-den');
+      const viewVang = document.getElementById('tab-vang');
+      const viewDen = document.getElementById('tab-den');
+
+      if(tab === 'vang') {
+        btnVang.className = "w-1/2 text-center font-bold text-xs py-2.5 rounded-lg bg-amber-500 text-slate-950 shadow";
+        btnDen.className = "w-1/2 text-center font-bold text-xs py-2.5 rounded-lg text-slate-400";
+        viewVang.classList.remove('hidden');
+        viewDen.classList.add('hidden');
+      } else {
+        btnDen.className = "w-1/2 text-center font-bold text-xs py-2.5 rounded-lg bg-emerald-500 text-slate-950 shadow";
+        btnVang.className = "w-1/2 text-center font-bold text-xs py-2.5 rounded-lg text-slate-400";
+        viewDen.classList.remove('hidden');
+        viewVang.classList.add('hidden');
+      }
+    }
+
+    async function fetchUpdate() {
       try {
         let res = await fetch(`${CONFIG_API_URL}?action=getDashboard`);
         let data = await res.json();
         
         document.getElementById('live-siso').innerText = `${data.daDenCount} / ${data.tongSo}`;
-        document.getElementById('badge-da-den').innerText = data.daDenCount;
-        document.getElementById('badge-vang').innerText = data.listVang.length;
-        document.getElementById('badge-ngoai').innerText = data.listNgoaiDs.length;
+        document.getElementById('count-vang').innerText = data.listVang.length;
+        document.getElementById('count-den').innerText = data.daDenCount + data.listNgoaiDs.length;
 
-        // Render Đã đến (Ưu tiên người mới quét lên đầu)
-        let htmlDaDen = "";
+        // 1. Render Học viên Vắng (Chưa đến)
+        if(data.listVang.length === 0) {
+          document.getElementById('empty-vang').classList.remove('hidden');
+          document.getElementById('container-vang').innerHTML = "";
+        } else {
+          document.getElementById('empty-vang').classList.add('hidden');
+          let htmlVang = "";
+          data.listVang.forEach(item => {
+            htmlVang += `<div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800/60 flex justify-between items-center shadow-sm">
+              <div class="truncate max-w-[65%]">
+                <p class="font-bold text-slate-200 text-sm truncate">${item.hoTen}</p>
+                <p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • ${item.pb}</p>
+              </div>
+              <a href="tel:${item.sdt}" class="bg-amber-500 active:bg-amber-600 text-slate-950 text-xs font-black px-4 py-2 rounded-xl transition-all shadow-md shadow-amber-500/10 flex items-center gap-1">
+                📞 Gọi ngay
+              </a>
+            </div>`;
+          });
+          document.getElementById('container-vang').innerHTML = htmlVang;
+        }
+
+        // 2. Render Học viên Đã Đến
+        let htmlDen = "";
         data.listDaDen.reverse().forEach(item => {
-          htmlDaDen += `<div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 flex justify-between items-center shadow-sm">
-            <div><p class="font-bold text-slate-100 text-sm">${item.hoTen}</p><p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • 📞 ${item.sdt}</p></div>
-            <span class="text-[11px] bg-emerald-500/10 text-emerald-400 font-mono px-2 py-1 rounded-md font-bold">${item.time}</span>
+          htmlDen += `<div class="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20 flex justify-between items-center">
+            <div>
+              <p class="font-bold text-slate-300 text-sm">${item.hoTen}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">${item.maNV} • 📞 ${item.sdt}</p>
+            </div>
+            <span class="text-[10px] bg-emerald-500/10 text-emerald-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
           </div>`;
         });
-        document.getElementById('list-da-den').innerHTML = htmlDaDen;
+        document.getElementById('container-den').innerHTML = htmlDen;
 
-        // Render Vắng (Có nút gọi khẩn cấp)
-        let htmlVang = "";
-        data.listVang.forEach(item => {
-          htmlVang += `<div class="bg-slate-900/50 p-3.5 rounded-xl border border-dashed border-slate-800 flex justify-between items-center">
-            <div><p class="font-semibold text-slate-300 text-sm">${item.hoTen}</p><p class="text-[11px] text-slate-500 font-medium mt-0.5">${item.maNV} • ${item.pb}</p></div>
-            <a href="tel:${item.sdt}" class="text-[11px] bg-amber-500/10 text-amber-400 hover:bg-amber-400 hover:text-slate-950 font-bold px-3 py-1.5 rounded-lg transition-all duration-200">Gọi ngay</a>
-          </div>`;
-        });
-        document.getElementById('list-vang').innerHTML = htmlVang;
+        // 3. Render Ngoài danh sách (Nếu có)
+        if(data.listNgoaiDs.length > 0) {
+          document.getElementById('wrapper-ngoai').classList.remove('hidden');
+          let htmlNgoai = "";
+          data.listNgoaiDs.reverse().forEach(item => {
+            htmlNgoai += `<div class="bg-rose-950/20 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
+              <div>
+                <p class="font-bold text-rose-400 text-sm">Mã gõ: ${item.maNV}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Tên hệ thống lưu: ${item.hoTen}</p>
+              </div>
+              <span class="text-[10px] bg-rose-500/10 text-rose-400 font-mono font-bold px-2 py-1 rounded-md">${item.time}</span>
+            </div>`;
+          });
+          document.getElementById('container-ngoai').innerHTML = htmlNgoai;
+        } else {
+          document.getElementById('wrapper-ngoai').classList.add('hidden');
+        }
 
-        // Render Ngoài danh sách
-        let htmlNgoai = "";
-        data.listNgoaiDs.reverse().forEach(item => {
-          htmlNgoai += `<div class="bg-rose-950/20 p-3.5 rounded-xl border border-rose-500/20 flex justify-between items-center">
-            <div><p class="font-bold text-rose-300 text-sm">Mã: ${item.maNV}</p><p class="text-[11px] text-slate-400 mt-0.5">Tên tự nhập: ${item.hoTen}</p></div>
-            <span class="text-[11px] bg-rose-500/10 text-rose-400 font-mono px-2 py-1 rounded-md font-bold">${item.time}</span>
-          </div>`;
-        });
-        document.getElementById('list-ngoai').innerHTML = htmlNgoai;
-
-      } catch(e) { console.error("Lỗi đồng bộ Dashboard: ", e); }
+      } catch (e) { console.error("Lỗi đồng bộ: ", e); }
     }
 
-    setInterval(syncDashboard, 2500); // Quét cập nhật tự động sau mỗi 2.5 giây
-    window.onload = syncDashboard;
+    setInterval(fetchUpdate, 3000);
+    window.onload = fetchUpdate;
   </script>
 </body>
 </html>
