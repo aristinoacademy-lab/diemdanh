@@ -42,16 +42,17 @@
 
   <script>
     window.onload = async function() {
-      try {
-        let res = await fetch(CONFIG_API_URL);
-        let config = await res.json();
-        document.getElementById('class-title').innerText = config.Ten_Lop;
-        document.getElementById('class-teacher').innerText = "Giảng viên: " + config.Giang_Vien;
-        document.getElementById('class-slogan').innerText = `"${config.Slogan}"`;
-      } catch(e) {
-        document.getElementById('class-title').innerText = "Lỗi kết nối dữ liệu!";
-      }
-    };
+  try {
+    let res = await fetch(CONFIG_API_URL);
+    let config = await res.json();
+    // Đồng bộ chữ viết thường để triệt tiêu lỗi hiển thị
+    document.getElementById('class-title').innerText = config.ten_lop || "Chưa có tên lớp";
+    document.getElementById('class-teacher').innerText = "Giảng viên: " + (config.giang_vien || "Chưa rõ");
+    document.getElementById('class-slogan').innerText = config.slogan ? `"${config.slogan}"` : '"Chúc bạn học tập tốt!"';
+  } catch(e) {
+    document.getElementById('class-title').innerText = "Lỗi kết nối dữ liệu!";
+  }
+};
 
     async function executeCheckIn() {
       const input = document.getElementById('input-maNV');
